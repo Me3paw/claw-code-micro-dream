@@ -2773,7 +2773,7 @@ fn run_resume_command(
         SlashCommand::Memory => Ok(ResumeCommandOutcome {
             session: session.clone(),
             message: Some(render_memory_report()?),
-            json: None,
+            json: Some(render_memory_json()?),
         }),
         SlashCommand::Init => {
             let message = init_claude_md()?;
@@ -2829,11 +2829,14 @@ fn run_resume_command(
                 json: Some(handle_skills_slash_command_json(args.as_deref(), &cwd)?),
             })
         }
-        SlashCommand::Doctor => Ok(ResumeCommandOutcome {
-            session: session.clone(),
-            message: Some(render_doctor_report()?.render()),
-            json: None,
-        }),
+        SlashCommand::Doctor => {
+            let report = render_doctor_report()?;
+            Ok(ResumeCommandOutcome {
+                session: session.clone(),
+                message: Some(report.render()),
+                json: Some(report.json_value()),
+            })
+        }
         SlashCommand::Stats => {
             let usage = UsageTracker::from_session(session).cumulative_usage();
             Ok(ResumeCommandOutcome {
@@ -5419,6 +5422,28 @@ fn render_memory_report() -> Result<String, Box<dyn std::error::Error>> {
         "
 ",
     ))
+}
+
+fn render_memory_json() -> Result<serde_json::Value, Box<dyn std::error::Error>> {
+    let cwd = env::current_dir()?;
+    let project_context = ProjectContext::discover(&cwd, DEFAULT_DATE)?;
+    let files: Vec<_> = project_context
+        .instruction_files
+        .iter()
+        .map(|f| {
+            json!({
+                "path": f.path.display().to_string(),
+                "lines": f.content.lines().count(),
+                "preview": f.content.lines().next().unwrap_or("").trim(),
+            })
+        })
+        .collect();
+    Ok(json!({
+        "kind": "memory",
+        "cwd": cwd.display().to_string(),
+        "instruction_files": files.len(),
+        "files": files,
+    }))
 }
 
 fn init_claude_md() -> Result<String, Box<dyn std::error::Error>> {
