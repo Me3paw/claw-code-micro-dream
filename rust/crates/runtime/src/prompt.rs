@@ -59,6 +59,8 @@ pub struct ProjectContext {
     pub git_diff: Option<String>,
     pub git_context: Option<GitContext>,
     pub instruction_files: Vec<ContextFile>,
+    pub dream_timeline: Option<ContextFile>,
+    pub dream_kb: Option<ContextFile>,
 }
 
 impl ProjectContext {
@@ -68,6 +70,7 @@ impl ProjectContext {
     ) -> std::io::Result<Self> {
         let cwd = cwd.into();
         let instruction_files = discover_instruction_files(&cwd)?;
+        let (dream_timeline, dream_kb) = discover_dream_files(&cwd)?;
         Ok(Self {
             cwd,
             current_date: current_date.into(),
@@ -75,6 +78,8 @@ impl ProjectContext {
             git_diff: None,
             git_context: None,
             instruction_files,
+            dream_timeline,
+            dream_kb,
         })
     }
 
@@ -157,6 +162,10 @@ impl SystemPromptBuilder {
             if !project_context.instruction_files.is_empty() {
                 sections.push(render_instruction_files(&project_context.instruction_files));
             }
+            let dream_content = render_dream_context(&project_context.dream_timeline, &project_context.dream_kb);
+            if !dream_content.is_empty() {
+                sections.push(dream_content);
+            }
         }
         if let Some(config) = &self.config {
             sections.push(render_config_section(config));
@@ -235,6 +244,50 @@ fn push_context_file(files: &mut Vec<ContextFile>, path: PathBuf) -> std::io::Re
     }
 }
 
+fn discover_dream_files(cwd: &Path) -> std::io::Result<(Option<ContextFile>, Option<ContextFile>)> {
+    let mut timeline = None;
+    let mut kb = None;
+
+    let mut cursor = Some(cwd);
+    while let Some(dir) = cursor {
+        let name = dir.file_name().and_then(|n| n.to_str()).unwrap_or("");
+        if name.is_empty() {
+            cursor = dir.parent();
+            continue;
+        }
+
+        if timeline.is_none() {
+            let timeline_path = dir.join(format!("timeline_{name}.md"));
+            if timeline_path.exists() {
+                timeline = read_context_file(timeline_path)?;
+            }
+        }
+
+        if kb.is_none() {
+            let kb_path = dir.join(format!("knowledge_base_{name}.md"));
+            if kb_path.exists() {
+                kb = read_context_file(kb_path)?;
+            }
+        }
+
+        if timeline.is_some() && kb.is_some() {
+            break;
+        }
+        cursor = dir.parent();
+    }
+
+    Ok((timeline, kb))
+}
+
+fn read_context_file(path: PathBuf) -> std::io::Result<Option<ContextFile>> {
+    match fs::read_to_string(&path) {
+        Ok(content) if !content.trim().is_empty() => Ok(Some(ContextFile { path, content })),
+        Ok(_) => Ok(None),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(None),
+        Err(error) => Err(error),
+    }
+}
+
 fn read_git_status(cwd: &Path) -> Option<String> {
     let output = Command::new("git")
         .args(["--no-optional-locks", "status", "--short", "--branch"])
@@ -297,6 +350,9 @@ fn render_project_context(project_context: &ProjectContext) -> String {
             project_context.instruction_files.len()
         ));
     }
+    if project_context.dream_timeline.is_some() || project_context.dream_kb.is_some() {
+        bullets.push("Project dream context loaded (timeline and/or knowledge base).".to_string());
+    }
     lines.extend(prepend_bullets(bullets));
     if let Some(status) = &project_context.git_status {
         lines.push(String::new());
@@ -346,6 +402,25 @@ fn render_instruction_files(files: &[ContextFile]) -> String {
 
         sections.push(format!("## {}", describe_instruction_file(file, files)));
         sections.push(rendered_content);
+    }
+    sections.join("\n\n")
+}
+
+fn render_dream_context(timeline: &Option<ContextFile>, kb: &Option<ContextFile>) -> String {
+    let mut sections = Vec::new();
+    if let Some(kb) = kb {
+        sections.push(format!(
+            "# Durable memories (from {})\n{}",
+            display_context_path(&kb.path),
+            kb.content
+        ));
+    }
+    if let Some(timeline) = timeline {
+        sections.push(format!(
+            "# Session timeline (from {})\n{}",
+            display_context_path(&timeline.path),
+            timeline.content
+        ));
     }
     sections.join("\n\n")
 }

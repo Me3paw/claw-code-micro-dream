@@ -1,4 +1,9 @@
-# Claw Code
+# Claw Code (Micro-Dream Edition)
+
+> [!CAUTION]
+> **THIS IS A VIBE-CODED FORK** of [ultraworkers/claw-code](https://github.com/ultraworkers/claw-code). 
+> It is optimized for **low-end spec LLMs** (local Ollama models, small-context agents) that choke on long session histories.
+> **YMMV (Your Mileage May Vary):** Things might break, hallucinations might happen, and the "vibes" are the primary architectural constraint.
 
 <p align="center">
   <a href="https://github.com/ultraworkers/claw-code">ultraworkers/claw-code</a>
@@ -33,6 +38,15 @@ The canonical implementation lives in [`rust/`](./rust), and the current source 
 
 > [!IMPORTANT]
 > Start with [`USAGE.md`](./USAGE.md) for build, auth, CLI, session, and parity-harness workflows. Make `claw doctor` your first health check after building, use [`rust/README.md`](./rust/README.md) for crate-level details, read [`PARITY.md`](./PARITY.md) for the current Rust-port checkpoint, and see [`docs/container.md`](./docs/container.md) for the container-first workflow.
+
+## The "Micro-Dream" Strategy
+
+This fork introduces the `/dream` command (implemented in Python) to solve the "context bloat" problem for smaller models.
+
+- **Turn-by-Turn Summarization:** Instead of dumping 50 messages into the model, we process each "turn" into a single, high-signal milestone.
+- **Compressed Timeline:** Converts raw logs into a `timeline_{project}.md` that tracks *what* was done and *why*, without the noise.
+- **Durable Knowledge Base:** Extracts technical facts (e.g., "The API key is in .env.local", "We use snake_case for IDs") into `knowledge_base_{project}.md`.
+- **System Prompt Injection:** The Rust runtime automatically discovers these `.md` files in your project root and injects them into the **System Prompt**. This keeps the model "aware" of previous sessions without needing the full history.
 
 ## Current repository shape
 
