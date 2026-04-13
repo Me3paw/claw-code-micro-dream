@@ -245,6 +245,11 @@
     "responsibility": "Command module mirrored from archived TypeScript path commands/doctor/index.ts"
   },
   {
+    "name": "dream",
+    "source_hint": "src/dream.py",
+    "responsibility": "Dreamer session-summarization logic"
+  },
+  {
     "name": "effort",
     "source_hint": "commands/effort/effort.tsx",
     "responsibility": "Command module mirrored from archived TypeScript path commands/effort/effort.tsx"

@@ -2949,7 +2949,8 @@ fn run_resume_command(
         | SlashCommand::Ide { .. }
         | SlashCommand::Tag { .. }
         | SlashCommand::OutputStyle { .. }
-        | SlashCommand::AddDir { .. } => Err("unsupported resumed slash command".into()),
+        | SlashCommand::AddDir { .. }
+        | SlashCommand::Dream => Err("unsupported resumed slash command".into()),
     }
 }
 
@@ -3781,6 +3782,73 @@ impl LiveCli {
         }
     }
 
+    fn run_dream(&mut self) -> Result<(), Box<dyn std::error::Error>> {
+        let mut project_root = None;
+
+        // 1. Try from CWD first
+        let mut root = std::env::current_dir()?;
+        for _ in 0..10 {
+            if root.join("src/main.py").is_file() {
+                project_root = Some(root.clone());
+                break;
+            }
+            if let Some(parent) = root.parent() {
+                root = parent.to_path_buf();
+            } else {
+                break;
+            }
+        }
+
+        // 2. If not found, try from executable path
+        if project_root.is_none() {
+            if let Ok(mut exe_path) = std::env::current_exe() {
+                while let Some(parent) = exe_path.parent() {
+                    exe_path = parent.to_path_buf();
+                    if exe_path.join("src/main.py").is_file() {
+                        project_root = Some(exe_path.clone());
+                        break;
+                    }
+                }
+            }
+        }
+
+        let mut command = std::process::Command::new("python3");
+        command.args(["-m", "src.main", "dream"]);
+        command.env("CLAW_MODEL", &self.model);
+
+        if let Ok(cwd) = std::env::current_dir() {
+            command.env("CLAW_WORKING_DIR", cwd);
+        }
+
+        // Pass through OpenAI-compatible API settings if available in the environment
+        if let Ok(url) = std::env::var("OPENAI_BASE_URL") {
+            command.env("OPENAI_BASE_URL", url);
+        }
+        if let Ok(key) = std::env::var("OPENAI_API_KEY") {
+            command.env("OPENAI_API_KEY", key);
+        }
+        if let Ok(url) = std::env::var("OLLAMA_API_URL") {
+            command.env("OLLAMA_API_URL", url);
+        }
+
+        if let Some(ref root_path) = project_root {
+            // Setting current_dir to project root makes 'src' visible as a module
+            command.current_dir(root_path);
+            command.env("PYTHONPATH", root_path);
+        }
+
+        let status = command.status()?;
+
+        if !status.success() {
+            if project_root.is_none() {
+                eprintln!("Dreamer failed: could not find project root (containing 'src/main.py') from CWD or executable path.");
+            } else {
+                eprintln!("Dreamer failed with status: {status}");
+            }
+        }
+        Ok(())
+    }
+
     fn run_turn_with_output(
         &mut self,
         input: &str,
@@ -3923,6 +3991,10 @@ impl LiveCli {
             }
             SlashCommand::Init => {
                 run_init(CliOutputFormat::Text)?;
+                false
+            }
+            SlashCommand::Dream => {
+                self.run_dream()?;
                 false
             }
             SlashCommand::Diff => {

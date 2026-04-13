@@ -149,6 +149,13 @@ const SLASH_COMMAND_SPECS: &[SlashCommandSpec] = &[
         resume_supported: true,
     },
     SlashCommandSpec {
+        name: "dream",
+        aliases: &[],
+        summary: "Run the dreamer session-summarization logic",
+        argument_hint: None,
+        resume_supported: true,
+    },
+    SlashCommandSpec {
         name: "diff",
         aliases: &[],
         summary: "Show git diff for current workspace changes",
@@ -1081,6 +1088,7 @@ pub enum SlashCommand {
     },
     Memory,
     Init,
+    Dream,
     Diff,
     Version,
     Export {
@@ -1230,6 +1238,7 @@ impl SlashCommand {
             Self::Pr { .. } => "/pr",
             Self::Issue { .. } => "/issue",
             Self::Init => "/init",
+            Self::Dream => "/dream",
             Self::Bughunter { .. } => "/bughunter",
             Self::Ultraplan { .. } => "/ultraplan",
             Self::Teleport { .. } => "/teleport",
@@ -1365,6 +1374,10 @@ pub fn validate_slash_command_input(
         "init" => {
             validate_no_args(command, &args)?;
             SlashCommand::Init
+        }
+        "dream" => {
+            validate_no_args(command, &args)?;
+            SlashCommand::Dream
         }
         "diff" => {
             validate_no_args(command, &args)?;
@@ -4062,6 +4075,7 @@ pub fn handle_slash_command(
         | SlashCommand::Mcp { .. }
         | SlashCommand::Memory
         | SlashCommand::Init
+        | SlashCommand::Dream
         | SlashCommand::Diff
         | SlashCommand::Version
         | SlashCommand::Export { .. }

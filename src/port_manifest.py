@@ -44,6 +44,7 @@ def build_port_manifest(src_root: Path | None = None) -> PortManifest:
         'tools.py': 'tool backlog metadata',
         'models.py': 'shared dataclasses',
         'task.py': 'task-level planning structures',
+        'dream.py': 'dreamer session-summarization logic',
     }
     modules = tuple(
         Subsystem(name=name, path=f'src/{name}', file_count=count, notes=notes.get(name, 'Python port support module'))
